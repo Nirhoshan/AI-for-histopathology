@@ -21,3 +21,52 @@ Following packages are required.
 *	lmdb
 *	albumentations
 
+## Dataset preparation
+
+We used publicly available datasets in our work.
+
+* NCT-CRC-HE-100K https://zenodo.org/records/1214456
+* Patch Camelyon https://patchcamelyon.grand-challenge.org/
+
+The dataset should follow the following structure
+
+```
+-- Patch Camelyon
+  -- training
+      -- <image-name>.jpg
+  -- validation
+      -- <image-name>.jpg
+```
+The dataloader reads the data though csv files. Example csv files have been provided (https://drive.google.com/drive/folders/1VepRvPOZ_B6CnH9kWzB0CBV60pB7BhiL?usp=share_link) for Patch camelyon and NCT-CRC-HE-100K for 100% labels available scenario.
+
+## Train the model
+
+To pretrain the model 
+
+```
+python main.py --training_data_csv <path-to-csv-file> --validation_data_csv <path-to-csv-file> --test_data_csv <path-to-csv-file> --dataset "nct100k" --data_input_dir <data-input-directory> --save_dir <save-directory>
+```
+
+To finetune the model 
+
+```
+python linear.py --model_path <pretrained_model_path> --training_data_csv <path-to-csv-file> --validation_data_csv <path-to-csv-file> --test_data_csv <path-to-csv-file> --dataset "nct100k" --data_input_dir <data-input-directory> --save_dir <save-directory> --finetune --uncertainty True
+```
+
+
+For knowledge distillation
+
+```
+python distillation.py --model_path <finetuned_model_path> --training_data_csv <path-to-csv-file> --validation_data_csv <path-to-csv-file> --test_data_csv <path-to-csv-file> --dataset "nct100k" --data_input_dir <data-input-directory> --save_dir <save-directory> --finetune --uncertainty True
+```
+
+The returned output would be similar to the output file available in the above drive link.
+
+## Hardware resources
+
+The results in the paper were produced using 4 Nvidia A100 GPUs with distributed training. `Batch_size` was set to 128. With this setting, the time it took for NCT-CRC-HE-100k data to pretrain for 500 epochs were 1.5 days, to finetune the model 12 hours and for knowledge distillation it took 12 hours.
+
+
+
+
+
