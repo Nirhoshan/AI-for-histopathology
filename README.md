@@ -68,6 +68,10 @@ python distillation.py --model_path <finetuned_model_path> --training_data_csv <
 
 The returned output for NCT-CRC-HE-100K would be similar to the output file available in the drive [link](https://drive.google.com/drive/folders/17uqMTyLAC6oJ26p6lEjV38DAsfTEJZ86?usp=share_link).
 
+## Pretrained models
+
+Pretrained models have been provided in the [drive](https://drive.google.com/drive/folders/1CiTqpTuWb-GY5sayhEAIFIX_8F75Wh89?usp=share_link) to reproduce the results for the scenario where 100% labels are available for both normal training and training with uncertainty score. Inference.ipynb file can be run to get the inference results for CRC-HE-VAL-7K dataset.
+
 ## Hardware resources
 
 The results in the paper were produced using 4 Nvidia A100 GPUs with distributed training. `Batch_size` was set to 128. With this setting, the time it took for NCT-CRC-HE-100k data to pretrain for 500 epochs were 1.5 days, to finetune the model 12 hours and for knowledge distillation it took 12 hours.
@@ -80,6 +84,8 @@ We have provided the visualization tool we used to analyse the trend of the mode
 * 1 (Red)    - Correct predictions with high uncertainty scores
 * 2 (Blue)   - Incorrect predictions with high uncertainty scores
 * 3 (Yellow) - Incorrect predictions with low uncertainty scores
+
+In the central region where the clusters attempt to merge, there is a notable increase in uncertainty, while towards the outer edges of each cluster, you'll find images that exhibit the lowest levels of uncertainty in their predictions.
 
 ## Acknowledgements
 
