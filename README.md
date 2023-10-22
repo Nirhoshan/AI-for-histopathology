@@ -74,7 +74,7 @@ The results in the paper were produced using 4 Nvidia A100 GPUs with distributed
 
 ## TSNE Visualizations
 
-We have provided the visualization tool we used to analyse the trend of the model predictions with uncertainty score in the [drive](https://drive.google.com/file/d/1QqGi_ORw7tsbnN9mNQMLBYAdIXn__LGZ/view?usp=share_link) . The colour coding used here is 
+We have provided the visualization tool we used to analyse the trend of the model predictions with uncertainty score for CRC-VAL-HE-7K in the [drive](https://drive.google.com/file/d/1QqGi_ORw7tsbnN9mNQMLBYAdIXn__LGZ/view?usp=share_link) . Each cluster represent each class of the dataset. The colour coding used here is 
 
 * 0 (Green)  - Correct predictions with low uncertainty scores
 * 1 (Red)    - Correct predictions with high uncertainty scores
