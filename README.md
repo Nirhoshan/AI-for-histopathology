@@ -66,7 +66,12 @@ The returned output would be similar to the output file available in the above d
 
 The results in the paper were produced using 4 Nvidia A100 GPUs with distributed training. `Batch_size` was set to 128. With this setting, the time it took for NCT-CRC-HE-100k data to pretrain for 500 epochs were 1.5 days, to finetune the model 12 hours and for knowledge distillation it took 12 hours.
 
+## Acknowledgements
 
+The code has parts extracted from
+
+* https://github.com/k-stacke/ssl-pathology
+* https://github.com/dougbrion/pytorch-classification-uncertainty
 
 
 
