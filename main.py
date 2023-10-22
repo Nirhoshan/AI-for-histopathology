@@ -1,23 +1,12 @@
-import os
 import argparse
 import os
 import json
-import numpy as np
 import pandas as pd
 import torch
 import torch.optim as optim
-import torch.nn as nn
 from torch.cuda import amp
-
-from torchvision import transforms
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-#from simclr.utils import distribute_over_GPUs,  validate_arguments
-#from simclr.get_dataloader import get_dataloader
-#from simclr.model import Model
-#from simclr.optimisers import LARS
-#from simclr.augmentations import Denormalize
 from utils import distribute_over_GPUs, reload_weights, validate_arguments
 from model import Model
 from get_dataloader import get_dataloader

@@ -9,22 +9,19 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.nn.modules.loss import _WeightedLoss
-from torch.utils.data import DataLoader
-# from simclr import utils
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingLR
 from tqdm import tqdm
 import sys
 
 sys.path.append('./')
-# import simclr
-# import simclr.utils.py
 from utils import distribute_over_GPUs, validate_arguments
 from model import Model, Identity
 from get_dataloader import get_dataloader
 from losses import edl_mse_loss, edl_digamma_loss, edl_log_loss, relu_evidence
 from helpers import get_device, rotate_img, one_hot_embedding
+import torch.multiprocessing
 
+torch.multiprocessing.set_sharing_strategy('file_system')
 torch.backends.cudnn.benchmark = True
 from sklearn.metrics import f1_score
 
@@ -53,38 +50,11 @@ class Net(nn.Module):
         return out
 
 
-class JointsMSELoss(nn.Module):
-    def __init__(self, use_target_weight):
-        super(JointsMSELoss, self).__init__()
-        self.criterion = nn.MSELoss(size_average=True)
-        self.use_target_weight = use_target_weight
-
-    def forward(self, output, target, target_weight):
-        batch_size = output.size(0)
-        num_joints = output.size(1)
-        heatmaps_pred = output.reshape((batch_size, num_joints, -1)).split(1, 1)
-        heatmaps_gt = target.reshape((batch_size, num_joints, -1)).split(1, 1)
-        loss = 0
-
-        for idx in range(num_joints):
-            heatmap_pred = heatmaps_pred[idx].squeeze()
-            heatmap_gt = heatmaps_gt[idx].squeeze()
-            if self.use_target_weight:
-                loss += 0.5 * self.criterion(
-                    heatmap_pred.mul(target_weight[:, idx]),
-                    heatmap_gt.mul(target_weight[:, idx])
-                )
-            else:
-                loss += 0.5 * self.criterion(heatmap_pred, heatmap_gt)
-
-        return loss / num_joints
-
-
 num_classes = 9
 
 
 # train or test for one epoch
-def train_val(net, net2, data_loader, train_optimizer, device):
+def train_val(net, net2, data_loader, train_optimizer, device, uncertainty=False):
     is_train = train_optimizer is not None
     # net2.eval() # train only the last layers.
     net2.train() if is_train else net2.eval()
@@ -102,41 +72,34 @@ def train_val(net, net2, data_loader, train_optimizer, device):
             data, target = data.cuda(non_blocking=True), target.cuda(non_blocking=True)
             # out = net(data)
             teacher_logits_t = net(data)
-            evidence_teach = relu_evidence(teacher_logits_t)
-            alpha_teach = evidence_teach + 1
-            S_teach = torch.sum(alpha_teach, dim=1, keepdim=True)
-            # m = nn.Sigmoid()
-            # nirho_coeff=m((1-(num_classes/S_teach)))
-            nirho_coeff = (1 - (num_classes / S_teach))
-            # nirho_coeff = nirho_coeff.to(device)
             student_logits_t = net2(data)
             _, teacher_labels = torch.max(teacher_logits_t.data, 1)
             if is_train:
                 ground_labels = teacher_labels
             else:
                 ground_labels = target
-            y = one_hot_embedding(teacher_labels, num_classes)
-            loss_t = criterion(student_logits_t, (y.float().to(device)), epoch, num_classes, 10, nirho_coeff, device)
-            # loss_t = add_kd_loss(student_logits_t, teacher_logits_t, temperature)
-            target_weight = None
-            # loss_t = loss_criterion3(student_logits_t, teacher_logits_t)
+            if uncertainty:
+                y = one_hot_embedding(teacher_labels.cpu(), num_classes)
+                loss_t = criterion(student_logits_t, (y.float().to(device)), epoch, num_classes, 10, device)
+                _, preds = torch.max(student_logits_t.data, 1)
+                match = torch.reshape(torch.eq(preds, teacher_labels).float(), (-1, 1))
+                acc = torch.mean(match)
+                evidence = relu_evidence(student_logits_t)
+
+                all_evidence = torch.cat((all_evidence, evidence), dim=0)
+                total_evidence = torch.sum(evidence, 1, keepdim=True)
+                mean_evidence = torch.mean(total_evidence)
+                mean_evidence_succ = torch.sum(torch.sum(evidence, 1, keepdim=True) * match) / torch.sum(match + 1e-20)
+                mean_evidence_fail = torch.sum(torch.sum(evidence, 1, keepdim=True) * (1 - match)) / (
+                        torch.sum(torch.abs(1 - match)) + 1e-20)
+            else:
+                loss_t = loss_criterion(student_logits_t, teacher_logits_t)
+                _, preds = torch.max(student_logits_t.data, 1)
 
             if is_train:
                 train_optimizer.zero_grad()
                 loss_t.backward()
                 train_optimizer.step()
-
-            _, preds = torch.max(student_logits_t.data, 1)
-            match = torch.reshape(torch.eq(preds, teacher_labels).float(), (-1, 1))
-            acc = torch.mean(match)
-            evidence = relu_evidence(student_logits_t)
-
-            all_evidence = torch.cat((all_evidence, evidence), dim=0)
-            total_evidence = torch.sum(evidence, 1, keepdim=True)
-            mean_evidence = torch.mean(total_evidence)
-            mean_evidence_succ = torch.sum(torch.sum(evidence, 1, keepdim=True) * match) / torch.sum(match + 1e-20)
-            mean_evidence_fail = torch.sum(torch.sum(evidence, 1, keepdim=True) * (1 - match)) / (
-                        torch.sum(torch.abs(1 - match)) + 1e-20)
 
             all_preds.extend(preds.cpu().numpy())
 
@@ -169,52 +132,60 @@ def train_val(net, net2, data_loader, train_optimizer, device):
             data_bar.set_description(
                 f'{"Train" if is_train else "Test"} Epoch: [{epoch}/{epochs}] Loss: {total_loss / total_num:.4f} ACC: {total_correct / total_num * 100:.2f}% f1: {F1 * 100:.2f}%')
 
-    alpha = all_evidence + 1
-    u = num_classes / torch.sum(alpha, dim=1, keepdim=True)
-    prob = alpha / torch.sum(alpha, dim=1, keepdim=True)
-    u = u.cpu().data.numpy()
-    prob = prob.cpu().data.numpy()
-    u2 = u[:, 0]
-    prob_0 = prob[:, 0]
-    prob_1 = prob[:, 1]
-    prob_2 = prob[:, 2]
-    prob_3 = prob[:, 3]
-    prob_4 = prob[:, 4]
-    prob_5 = prob[:, 5]
-    prob_6 = prob[:, 6]
-    prob_7 = prob[:, 7]
-    prob_8 = prob[:, 8]
+    if uncertainty:
+        alpha = all_evidence + 1
+        u = num_classes / torch.sum(alpha, dim=1, keepdim=True)
+        prob = alpha / torch.sum(alpha, dim=1, keepdim=True)
+        u = u.cpu().data.numpy()
+        prob = prob.cpu().data.numpy()
+        u2 = u[:, 0]
+        prob_0 = prob[:, 0]
+        prob_1 = prob[:, 1]
+        prob_2 = prob[:, 2]
+        prob_3 = prob[:, 3]
+        prob_4 = prob[:, 4]
+        prob_5 = prob[:, 5]
+        prob_6 = prob[:, 6]
+        prob_7 = prob[:, 7]
+        prob_8 = prob[:, 8]
 
-    df = pd.DataFrame({
-        'label': all_labels,
-        'prediction': all_preds,
-        'slide_id': all_slides,
-        'patch_id': all_patches,
-        'probabilities_0': all_outputs0,
-        'probabilities_1': all_outputs1,
-        'probabilities_2': all_outputs2,
-        'probabilities_3': all_outputs3,
-        'probabilities_4': all_outputs4,
-        'probabilities_5': all_outputs5,
-        'probabilities_6': all_outputs6,
-        'probabilities_7': all_outputs7,
-        'probabilities_8': all_outputs8,
-        'uncertainty': u2,
-        'prob_0': prob_0,
-        'prob_1': prob_1,
-        'prob_2': prob_2,
-        'prob_3': prob_3,
-        'prob_4': prob_4,
-        'prob_5': prob_5,
-        'prob_6': prob_6,
-        'prob_7': prob_7,
-        'prob_8': prob_8
-    })
+        df = pd.DataFrame({
+            'label': all_labels,
+            'prediction': all_preds,
+            'slide_id': all_slides,
+            'patch_id': all_patches,
+            'uncertainty': u2,
+            'prob_0': prob_0,
+            'prob_1': prob_1,
+            'prob_2': prob_2,
+            'prob_3': prob_3,
+            'prob_4': prob_4,
+            'prob_5': prob_5,
+            'prob_6': prob_6,
+            'prob_7': prob_7,
+            'prob_8': prob_8
+        })
+    else:
+        df = pd.DataFrame({
+            'label': all_labels,
+            'prediction': all_preds,
+            'slide_id': all_slides,
+            'patch_id': all_patches,
+            'probabilities_0': all_outputs0,
+            'probabilities_1': all_outputs1,
+            'probabilities_2': all_outputs2,
+            'probabilities_3': all_outputs3,
+            'probabilities_4': all_outputs4,
+            'probabilities_5': all_outputs5,
+            'probabilities_6': all_outputs6,
+            'probabilities_7': all_outputs7,
+            'probabilities_8': all_outputs8,
+        })
     return total_loss / total_num, total_correct / total_num * 100, df, F1
 
 
 # train or test for one epoch
-def test_val(net2, data_loader, train_optimizer, device):
+def test_val(net2, data_loader, train_optimizer, device, uncertainty=False):
     is_train = train_optimizer is not None
     net2.eval()  # train only the last layers.
     # net2.train() if is_train else net.eval()
@@ -231,9 +202,8 @@ def test_val(net2, data_loader, train_optimizer, device):
             data, target = data.cuda(non_blocking=True), target.cuda(non_blocking=True)
             student_logits_t = net2(data)
             # loss = loss_criterion2(student_logits_t, target)
-            y = one_hot_embedding(target, num_classes)
-            nirho_coeff = 1
-            loss = criterion(student_logits_t, y.float(), epoch, num_classes, 10, nirho_coeff, device)
+            y = one_hot_embedding(target.cpu(), num_classes)
+            loss = criterion(student_logits_t, y.float(), epoch, num_classes, 10, device)
 
             if is_train:
                 train_optimizer.zero_grad()
@@ -250,7 +220,7 @@ def test_val(net2, data_loader, train_optimizer, device):
             mean_evidence = torch.mean(total_evidence)
             mean_evidence_succ = torch.sum(torch.sum(evidence, 1, keepdim=True) * match) / torch.sum(match + 1e-20)
             mean_evidence_fail = torch.sum(torch.sum(evidence, 1, keepdim=True) * (1 - match)) / (
-                        torch.sum(torch.abs(1 - match)) + 1e-20)
+                    torch.sum(torch.abs(1 - match)) + 1e-20)
 
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(target.cpu().data.numpy())
@@ -275,48 +245,55 @@ def test_val(net2, data_loader, train_optimizer, device):
             data_bar.set_description(
                 f'{"Train" if is_train else "Test"} Epoch: [{epoch}/{epochs}] Loss: {total_loss / total_num:.4f} ACC: {total_correct / total_num * 100:.2f}% f1: {F1 * 100:.2f}%')
 
-    alpha = all_evidence + 1
-    u = num_classes / torch.sum(alpha, dim=1, keepdim=True)
-    prob = alpha / torch.sum(alpha, dim=1, keepdim=True)
-    u = u.cpu().data.numpy()
-    prob = prob.cpu().data.numpy()
-    u2 = u[:, 0]
-    prob_0 = prob[:, 0]
-    prob_1 = prob[:, 1]
-    prob_2 = prob[:, 2]
-    prob_3 = prob[:, 3]
-    prob_4 = prob[:, 4]
-    prob_5 = prob[:, 5]
-    prob_6 = prob[:, 6]
-    prob_7 = prob[:, 7]
-    prob_8 = prob[:, 8]
+    if uncertainty:
+        alpha = all_evidence + 1
+        u = num_classes / torch.sum(alpha, dim=1, keepdim=True)
+        prob = alpha / torch.sum(alpha, dim=1, keepdim=True)
+        u = u.cpu().data.numpy()
+        prob = prob.cpu().data.numpy()
+        u2 = u[:, 0]
+        prob_0 = prob[:, 0]
+        prob_1 = prob[:, 1]
+        prob_2 = prob[:, 2]
+        prob_3 = prob[:, 3]
+        prob_4 = prob[:, 4]
+        prob_5 = prob[:, 5]
+        prob_6 = prob[:, 6]
+        prob_7 = prob[:, 7]
+        prob_8 = prob[:, 8]
 
-    df = pd.DataFrame({
-        'label': all_labels,
-        'prediction': all_preds,
-        'slide_id': all_slides,
-        'patch_id': all_patches,
-        'probabilities_0': all_outputs0,
-        'probabilities_1': all_outputs1,
-        'probabilities_2': all_outputs2,
-        'probabilities_3': all_outputs3,
-        'probabilities_4': all_outputs4,
-        'probabilities_5': all_outputs5,
-        'probabilities_6': all_outputs6,
-        'probabilities_7': all_outputs7,
-        'probabilities_8': all_outputs8,
-        'uncertainty': u2,
-        'prob_0': prob_0,
-        'prob_1': prob_1,
-        'prob_2': prob_2,
-        'prob_3': prob_3,
-        'prob_4': prob_4,
-        'prob_5': prob_5,
-        'prob_6': prob_6,
-        'prob_7': prob_7,
-        'prob_8': prob_8
-    })
-
+        df = pd.DataFrame({
+            'label': all_labels,
+            'prediction': all_preds,
+            'slide_id': all_slides,
+            'patch_id': all_patches,
+            'uncertainty': u2,
+            'prob_0': prob_0,
+            'prob_1': prob_1,
+            'prob_2': prob_2,
+            'prob_3': prob_3,
+            'prob_4': prob_4,
+            'prob_5': prob_5,
+            'prob_6': prob_6,
+            'prob_7': prob_7,
+            'prob_8': prob_8
+        })
+    else:
+        df = pd.DataFrame({
+            'label': all_labels,
+            'prediction': all_preds,
+            'slide_id': all_slides,
+            'patch_id': all_patches,
+            'probabilities_0': all_outputs0,
+            'probabilities_1': all_outputs1,
+            'probabilities_2': all_outputs2,
+            'probabilities_3': all_outputs3,
+            'probabilities_4': all_outputs4,
+            'probabilities_5': all_outputs5,
+            'probabilities_6': all_outputs6,
+            'probabilities_7': all_outputs7,
+            'probabilities_8': all_outputs8,
+        })
     return total_loss / total_num, total_correct / total_num * 100, df, F1
 
 
@@ -456,22 +433,19 @@ if __name__ == '__main__':
 
     scheduler = CosineAnnealingLR(optimizer, opt.epochs)
     uncertain = opt.uncertainty
-    if uncertain:
-        criterion = edl_mse_loss
-    else:
-        loss_criterion = JointsMSELoss(use_target_weight=False).to(opt.device)
+    criterion = edl_mse_loss
+    loss_criterion = nn.MSELoss(size_average=True).to(opt.device)
 
     loss_criterion2 = nn.CrossEntropyLoss()
-
-    loss_criterion3 = nn.MSELoss(size_average=True).to(opt.device)
     results = {'train_loss': [], 'train_acc': [],
                'val_loss': [], 'val_acc': [], 'F1_score': []}
     best_acc = 0.0
     for epoch in range(1, epochs + 1):
-        train_loss, train_acc, _, F1 = train_val(model_t, model_s, train_loader, optimizer, opt.device)
+        train_loss, train_acc, _, F1 = train_val(model_t, model_s, train_loader, optimizer, opt.device,
+                                                 uncertainty=uncertain)
         results['train_loss'].append(train_loss)
         results['train_acc'].append(train_acc)
-        val_loss, val_acc, _, F1 = test_val(model_s, val_loader, None, opt.device)
+        val_loss, val_acc, _, F1 = test_val(model_s, val_loader, None, opt.device, uncertainty=uncertain)
         results['val_loss'].append(val_loss)
         results['val_acc'].append(val_acc)
         results['F1_score'].append(F1)
@@ -496,7 +470,7 @@ if __name__ == '__main__':
     # Load saved model
     model_s.load_state_dict(torch.load(f'{opt.log_path}/linear_model2.pth'))
     model_s.eval()
-    test_loss, test_acc, df, F1 = test_val(model_s, test_loader, None, opt.device)
+    test_loss, test_acc, df, F1 = test_val(model_s, test_loader, None, opt.device, uncertainty=uncertain)
     test_stat = [test_loss, test_acc, F1]
     test_statis = pd.DataFrame(data=test_stat)
     test_statis.to_csv(f"{opt.log_path}/test_stat.csv", index=False, header=None)

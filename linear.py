@@ -1,5 +1,4 @@
 import os
-# os.chdir(r"C:\Users\Nirho\PycharmProjects\ssl-pathology-main")
 import argparse
 import os
 import json
@@ -22,7 +21,9 @@ from model import Model
 from get_dataloader import get_dataloader
 from losses import edl_mse_loss, relu_evidence
 from helpers import one_hot_embedding
+import torch.multiprocessing
 
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 torch.backends.cudnn.benchmark = True
 
@@ -88,7 +89,7 @@ def train_val(net, data_loader, train_optimizer, device, uncertainty=False):
                 mean_evidence = torch.mean(total_evidence)
                 mean_evidence_succ = torch.sum(torch.sum(evidence, 1, keepdim=True) * match) / torch.sum(match + 1e-20)
                 mean_evidence_fail = torch.sum(torch.sum(evidence, 1, keepdim=True) * (1 - match)) / (
-                            torch.sum(torch.abs(1 - match)) + 1e-20)
+                        torch.sum(torch.abs(1 - match)) + 1e-20)
 
 
             else:
@@ -148,31 +149,38 @@ def train_val(net, data_loader, train_optimizer, device, uncertainty=False):
         prob_7 = prob[:, 7]
         prob_8 = prob[:, 8]
 
-    df = pd.DataFrame({
-        'label': all_labels,
-        'prediction': all_preds,
-        'slide_id': all_slides,
-        'patch_id': all_patches,
-        'probabilities_0': all_outputs0,
-        'probabilities_1': all_outputs1,
-        'probabilities_2': all_outputs2,
-        'probabilities_3': all_outputs3,
-        'probabilities_4': all_outputs4,
-        'probabilities_5': all_outputs5,
-        'probabilities_6': all_outputs6,
-        'probabilities_7': all_outputs7,
-        'probabilities_8': all_outputs8,
-        'uncertainty': u2,
-        'prob_0': prob_0,
-        'prob_1': prob_1,
-        'prob_2': prob_2,
-        'prob_3': prob_3,
-        'prob_4': prob_4,
-        'prob_5': prob_5,
-        'prob_6': prob_6,
-        'prob_7': prob_7,
-        'prob_8': prob_8
-    })
+        df = pd.DataFrame({
+            'label': all_labels,
+            'prediction': all_preds,
+            'slide_id': all_slides,
+            'patch_id': all_patches,
+            'uncertainty': u2,
+            'prob_0': prob_0,
+            'prob_1': prob_1,
+            'prob_2': prob_2,
+            'prob_3': prob_3,
+            'prob_4': prob_4,
+            'prob_5': prob_5,
+            'prob_6': prob_6,
+            'prob_7': prob_7,
+            'prob_8': prob_8
+        })
+    else:
+        df = pd.DataFrame({
+            'label': all_labels,
+            'prediction': all_preds,
+            'slide_id': all_slides,
+            'patch_id': all_patches,
+            'probabilities_0': all_outputs0,
+            'probabilities_1': all_outputs1,
+            'probabilities_2': all_outputs2,
+            'probabilities_3': all_outputs3,
+            'probabilities_4': all_outputs4,
+            'probabilities_5': all_outputs5,
+            'probabilities_6': all_outputs6,
+            'probabilities_7': all_outputs7,
+            'probabilities_8': all_outputs8,
+        })
 
     # return total_loss / total_num, total_correct / total_num * 100, df,F1
     return total_loss / total_num, total_correct / total_num * 100, df, F1
@@ -306,7 +314,6 @@ if __name__ == '__main__':
     best_acc = 0.0
     for epoch in range(1, epochs + 1):
         train_loss, train_acc, _, _ = train_val(model, train_loader, optimizer, opt.device, uncertainty=uncertain)
-        # train_loss, train_acc, _ = train_val(model, train_loader, optimizer)
         results['train_loss'].append(train_loss)
         results['train_acc'].append(train_acc)
         val_loss, val_acc, _, F1 = train_val(model, val_loader, None, opt.device, uncertainty=uncertain)
