@@ -1,6 +1,6 @@
 # Contrastive Deep Encoding Enables Uncertainty-aware Machine-learning-assisted Histopathology
 
-This is the repository of the paper [Contrastive Deep Encoding Enables Uncertainty-aware Machine-learning-assisted Histopathology](https://arxiv.org/abs/2310.04429).
+This is the repository of the paper [Contrastive Deep Encoding Enables Uncertainty-aware Machine-learning-assisted Histopathology](https://arxiv.org/abs/2309.07113).
 
 
 ## Brief overview of the paper
