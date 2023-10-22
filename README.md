@@ -31,13 +31,19 @@ We used publicly available datasets in our work.
 The dataset should follow the following structure
 
 ```
--- Patch Camelyon
-  -- training
+-- NCT-CRC-HE-100K
+  -- ADI
       -- <image-name>.jpg
-  -- validation
+  -- BACK
+      -- <image-name>.jpg
+
+-- CRC-HE-VAL-7K
+  -- ADI
+      -- <image-name>.jpg
+  -- BACK
       -- <image-name>.jpg
 ```
-The dataloader reads the data though csv files. Example csv files have been provided (https://drive.google.com/drive/folders/1VepRvPOZ_B6CnH9kWzB0CBV60pB7BhiL?usp=share_link) for Patch camelyon and NCT-CRC-HE-100K for 100% labels available scenario.
+The dataloader reads the data though csv files. Example csv files have been provided in the google [drive](https://drive.google.com/drive/folders/1VepRvPOZ_B6CnH9kWzB0CBV60pB7BhiL?usp=share_link) for Patch camelyon and NCT-CRC-HE-100K for 100% labels available scenario.
 
 ## Train the model
 
@@ -60,11 +66,20 @@ For knowledge distillation
 python distillation.py --model_path <finetuned_model_path> --training_data_csv <path-to-csv-file> --validation_data_csv <path-to-csv-file> --test_data_csv <path-to-csv-file> --dataset "nct100k" --data_input_dir <data-input-directory> --save_dir <save-directory> --finetune --uncertainty True
 ```
 
-The returned output would be similar to the output file available in the above drive link.
+The returned output for NCT-CRC-HE-100K would be similar to the output file available in the drive [link](https://drive.google.com/drive/folders/17uqMTyLAC6oJ26p6lEjV38DAsfTEJZ86?usp=share_link).
 
 ## Hardware resources
 
 The results in the paper were produced using 4 Nvidia A100 GPUs with distributed training. `Batch_size` was set to 128. With this setting, the time it took for NCT-CRC-HE-100k data to pretrain for 500 epochs were 1.5 days, to finetune the model 12 hours and for knowledge distillation it took 12 hours.
+
+## TSNE Visualizations
+
+We have provided the visualization tool we used to analyse the trend of the model predictions with uncertainty score in the [drive](https://drive.google.com/file/d/1QqGi_ORw7tsbnN9mNQMLBYAdIXn__LGZ/view?usp=share_link) . The colour coding used here is 
+
+* 0 (Green)  - Correct predictions with low uncertainty scores
+* 1 (Red)    - Correct predictions with high uncertainty scores
+* 2 (Blue)   - Incorrect predictions with high uncertainty scores
+* 3 (Yellow) - Incorrect predictions with low uncertainty scores
 
 ## Acknowledgements
 
