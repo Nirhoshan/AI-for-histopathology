@@ -91,7 +91,7 @@ We have provided the visualization tool we used to analyse the trend of the mode
 
 ![TSNE-projection](https://github.com/Nirhoshan/AI-for-histopathology/assets/61936882/c9896738-8802-42de-b9d2-23c72c4ab61a)
 
-In the central region where the clusters attempt to merge, there is a notable increase in uncertainty, while towards the outer edges of each cluster, you'll find images that exhibit the lowest levels of uncertainty in their predictions.
+In the central region where the clusters attempt to merge, there is a notable increase in uncertainty, while towards the outer edges of each cluster, you'll find images that exhibit the lowest levels of uncertainty in their predictions. Explore the TSNE visualization tool in the drive to see the uncertainty score of every image embedded as TSNE points.
 
 ## Acknowledgements
 
