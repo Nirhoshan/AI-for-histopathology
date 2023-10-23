@@ -27,6 +27,7 @@ We used publicly available datasets in our work.
 
 * NCT-CRC-HE-100K https://zenodo.org/records/1214456
 * Patch Camelyon https://patchcamelyon.grand-challenge.org/
+* Camelyon16 https://camelyon16.grand-challenge.org/Download/
 
 The dataset should follow the following structure
 
