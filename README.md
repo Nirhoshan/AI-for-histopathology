@@ -1,6 +1,6 @@
 # Contrastive Deep Encoding Enables Uncertainty-aware Machine-learning-assisted Histopathology
 
-This is the repository of the paper [Contrastive Deep Encoding Enables Uncertainty-aware Machine-learning-assisted Histopathology](https://arxiv.org/abs/2310.04429).
+This is the repository of the paper [Contrastive Deep Encoding Enables Uncertainty-aware Machine-learning-assisted Histopathology](https://arxiv.org/abs/2309.07113).
 
 
 ## Brief overview of the paper
@@ -27,19 +27,30 @@ We used publicly available datasets in our work.
 
 * NCT-CRC-HE-100K https://zenodo.org/records/1214456
 * Patch Camelyon https://patchcamelyon.grand-challenge.org/
+* Camelyon16 https://camelyon16.grand-challenge.org/Download/
 
 The dataset should follow the following structure
 
 ```
--- Patch Camelyon
-  -- training
+-- NCT-CRC-HE-100K
+  -- ADI
       -- <image-name>.jpg
-  -- validation
+  -- BACK
+      -- <image-name>.jpg
+
+-- CRC-HE-VAL-7K
+  -- ADI
+      -- <image-name>.jpg
+  -- BACK
       -- <image-name>.jpg
 ```
-The dataloader reads the data though csv files. Example csv files have been provided (https://drive.google.com/drive/folders/1VepRvPOZ_B6CnH9kWzB0CBV60pB7BhiL?usp=share_link) for Patch camelyon and NCT-CRC-HE-100K for 100% labels available scenario.
+The dataloader reads the data though csv files. Example csv files have been provided in the google [drive](https://drive.google.com/drive/folders/1VepRvPOZ_B6CnH9kWzB0CBV60pB7BhiL?usp=share_link) for Patch camelyon and NCT-CRC-HE-100K for 100% labels available scenario.
 
 ## Train the model
+
+![Model](https://github.com/Nirhoshan/AI-for-histopathology/assets/61936882/434ddf25-28a7-4f3a-a89a-8a4133fc3095)
+
+
 
 To pretrain the model 
 
@@ -60,13 +71,35 @@ For knowledge distillation
 python distillation.py --model_path <finetuned_model_path> --training_data_csv <path-to-csv-file> --validation_data_csv <path-to-csv-file> --test_data_csv <path-to-csv-file> --dataset "nct100k" --data_input_dir <data-input-directory> --save_dir <save-directory> --finetune --uncertainty True
 ```
 
-The returned output would be similar to the output file available in the above drive link.
+The returned output for NCT-CRC-HE-100K would be similar to the output file available in the drive [link](https://drive.google.com/drive/folders/17uqMTyLAC6oJ26p6lEjV38DAsfTEJZ86?usp=share_link).
+
+## Pretrained models
+
+Pretrained models have been provided in the [drive](https://drive.google.com/drive/folders/1CiTqpTuWb-GY5sayhEAIFIX_8F75Wh89?usp=share_link) to reproduce the results for the scenario where 100% labels are available for both normal training and training with uncertainty score. Inference.ipynb file can be run to get the inference results for CRC-HE-VAL-7K dataset.
 
 ## Hardware resources
 
 The results in the paper were produced using 4 Nvidia A100 GPUs with distributed training. `Batch_size` was set to 128. With this setting, the time it took for NCT-CRC-HE-100k data to pretrain for 500 epochs were 1.5 days, to finetune the model 12 hours and for knowledge distillation it took 12 hours.
 
+## TSNE Visualizations
 
+We have provided the visualization tool we used to analyse the trend of the model predictions with uncertainty score for CRC-VAL-HE-7K in the [drive](https://drive.google.com/file/d/1QqGi_ORw7tsbnN9mNQMLBYAdIXn__LGZ/view?usp=share_link) . Each cluster represent each class of the dataset. The colour coding used here is 
+
+* 0 (Green)  - Correct predictions with low uncertainty scores
+* 1 (Red)    - Correct predictions with high uncertainty scores
+* 2 (Blue)   - Incorrect predictions with high uncertainty scores
+* 3 (Yellow) - Incorrect predictions with low uncertainty scores
+
+![TSNE-projection](https://github.com/Nirhoshan/AI-for-histopathology/assets/61936882/c9896738-8802-42de-b9d2-23c72c4ab61a)
+
+In the central region where the clusters attempt to merge, there is a notable increase in uncertainty, while towards the outer edges of each cluster, you'll find images that exhibit the lowest levels of uncertainty in their predictions. Explore the TSNE visualization tool in the drive to see the uncertainty score of every image embedded as TSNE points.
+
+## Acknowledgements
+
+The code has parts extracted from
+
+* https://github.com/k-stacke/ssl-pathology
+* https://github.com/dougbrion/pytorch-classification-uncertainty
 
 
 
