@@ -47,6 +47,10 @@ The dataloader reads the data though csv files. Example csv files have been prov
 
 ## Train the model
 
+![Model](https://github.com/Nirhoshan/AI-for-histopathology/assets/61936882/434ddf25-28a7-4f3a-a89a-8a4133fc3095)
+
+
+
 To pretrain the model 
 
 ```
@@ -84,6 +88,8 @@ We have provided the visualization tool we used to analyse the trend of the mode
 * 1 (Red)    - Correct predictions with high uncertainty scores
 * 2 (Blue)   - Incorrect predictions with high uncertainty scores
 * 3 (Yellow) - Incorrect predictions with low uncertainty scores
+
+![TSNE-projection](https://github.com/Nirhoshan/AI-for-histopathology/assets/61936882/c9896738-8802-42de-b9d2-23c72c4ab61a)
 
 In the central region where the clusters attempt to merge, there is a notable increase in uncertainty, while towards the outer edges of each cluster, you'll find images that exhibit the lowest levels of uncertainty in their predictions.
 
