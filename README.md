@@ -75,7 +75,22 @@ The returned output for NCT-CRC-HE-100K would be similar to the output file avai
 
 ## Pretrained models
 
-Pretrained models have been provided in the [drive](https://drive.google.com/drive/folders/1CiTqpTuWb-GY5sayhEAIFIX_8F75Wh89?usp=share_link) to reproduce the results for the scenario where 100% labels are available for both normal training and training with uncertainty score. Inference.ipynb file can be run to get the inference results for CRC-HE-VAL-7K dataset.
+Pretrained models have been provided in the [drive](https://drive.google.com/drive/folders/1CiTqpTuWb-GY5sayhEAIFIX_8F75Wh89?usp=share_link) to reproduce the results for the scenario where 100% labels are available for both normal training and training with uncertainty score. 
+
+## Instructions to run notebooks
+
+Follow following steps to run the notebooks
+
+* Create a virtual environment and install the above package requirements
+* Download the Dataset in the above given links.
+* Create or download the data csv files in the drive shared above.
+* Download the required trained model and place all files in the folder.
+* Change the parameters in the record class (inference.ipynb) accordingly.
+* Inference.ipynb will help you to run any trained model on NCT dataset.
+* Demo.ipynb will help you to visualize any four images given in a csv file (eg. nct4.csv) and provide the prediction and uncertainty score for each image.
+* Alternatively, you can directly run the demo.py and inference.py by setting the parameters.
+
+Time taken to run  the above demo would be around 10-15 minutes.
 
 ## Hardware resources
 
@@ -83,7 +98,7 @@ The results in the paper were produced using 4 Nvidia A100 GPUs with distributed
 
 ## TSNE Visualizations
 
-We have provided the visualization tool we used to analyse the trend of the model predictions with uncertainty score for CRC-VAL-HE-7K in the [drive](https://drive.google.com/file/d/1QqGi_ORw7tsbnN9mNQMLBYAdIXn__LGZ/view?usp=share_link) . Each cluster represent each class of the dataset. The colour coding used here is 
+We have provided the visualization tool we used to analyse the trend of the model predictions with uncertainty score for CRC-VAL-HE-7K in the [link](https://www.wadduwagelab.com/tsne) . Each cluster represents each class of the dataset. The colour coding used here is 
 
 * 0 (Green)  - Correct predictions with low uncertainty scores
 * 1 (Red)    - Correct predictions with high uncertainty scores
